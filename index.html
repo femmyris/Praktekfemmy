@@ -32,7 +32,17 @@ header{background:linear-gradient(135deg,#0f766e,#164e63);color:white;padding:24
 </div>
 
 <section id="dashboard" class="section active">
-<div class="notice">Data contoh tersedia untuk demonstrasi. Data pada browser tersimpan di <b>localStorage</b>. Untuk penggunaan multiuser/terpusat, hubungkan fungsi CRUD ke API/database sesuai struktur Excel yang disediakan.</div>
+<div class="card" id="apiConfigCard" style="margin-bottom:16px">
+<div class="filters" style="align-items:center">
+<label style="font-weight:700;font-size:13px;flex:1;min-width:280px">URL Web App Google Apps Script
+<input type="text" id="apiUrlInput" style="width:100%;margin-top:6px" placeholder="https://script.google.com/macros/s/.../exec">
+</label>
+<button class="btn" onclick="saveApiUrl()">💾 Simpan URL</button>
+<button class="btn secondary" onclick="loadData()">🔄 Muat Ulang</button>
+<span id="apiStatus" class="badge notyet">Belum terhubung</span>
+</div>
+</div>
+<div class="notice">Data disimpan terpusat melalui <b>Google Apps Script</b> yang terhubung ke Google Sheet (lihat Code.gs). Salinan cache tersimpan di localStorage sebagai cadangan bila koneksi terputus.</div>
 <div class="grid kpi">
 <div class="card"><div class="label">Total Kabupaten/Kota</div><div class="value" id="kpiWilayah">7</div></div>
 <div class="card"><div class="label">Desa Cantik</div><div class="value" id="kpiDesa">18</div></div>
@@ -87,8 +97,63 @@ header{background:linear-gradient(135deg,#0f766e,#164e63);color:white;padding:24
 const wilayah=["Kabupaten Bangka","Kabupaten Belitung","Kabupaten Bangka Barat","Kabupaten Bangka Tengah","Kabupaten Bangka Selatan","Kabupaten Belitung Timur","Kota Pangkalpinang"];
 const months=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 const sampleDesa=["Desa A","Desa B","Desa C"];
-let db=JSON.parse(localStorage.getItem("desaCantikDB")||"null")||{activities:[],reports:[]};
-function save(){localStorage.setItem("desaCantikDB",JSON.stringify(db))}
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbys9ecRyIcSXitCwE8k4wMqActwNCf7-IN7ZsPlv9SQobZpBzLiMOCgHRNMbRH6VQbA/exec";
+let db={activities:[],reports:[]};
+
+function getApiUrl(){return localStorage.getItem("desaCantikApiUrl")||DEFAULT_API_URL}
+function setApiUrl(url){localStorage.setItem("desaCantikApiUrl",url)}
+function setStatus(state){
+ const el=document.getElementById("apiStatus");
+ if(state==="loading"){el.className="badge process";el.textContent="Menghubungkan...";}
+ else if(state==="ok"){el.className="badge done";el.textContent="Terhubung";}
+ else{el.className="badge notyet";el.textContent="Gagal terhubung (pakai cache)";}
+}
+function saveApiUrl(){
+ const v=document.getElementById("apiUrlInput").value.trim();
+ if(!v){alert("Isi URL web app terlebih dahulu.");return}
+ setApiUrl(v); loadData();
+}
+async function apiGet(action,params={}){
+ const url=new URL(getApiUrl());
+ url.searchParams.set("action",action);
+ Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+ const res=await fetch(url.toString());
+ if(!res.ok) throw new Error("HTTP "+res.status);
+ const json=await res.json();
+ if(json.ok===false) throw new Error(json.error||"Gagal memuat data");
+ return json;
+}
+async function apiPost(action,payload={}){
+ const res=await fetch(getApiUrl(),{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,...payload})});
+ if(!res.ok) throw new Error("HTTP "+res.status);
+ const json=await res.json();
+ if(json.ok===false) throw new Error(json.error||"Gagal menyimpan data");
+ return json;
+}
+async function loadData(){
+ setStatus("loading");
+ try{
+  const data=await apiGet("getAll");
+  db.activities=data.activities||[]; db.reports=data.reports||[];
+  localStorage.setItem("desaCantikCache",JSON.stringify(db));
+  setStatus("ok");
+ }catch(err){
+  console.error(err);
+  const cached=JSON.parse(localStorage.getItem("desaCantikCache")||"null");
+  if(cached) db=cached;
+  setStatus("error");
+ }
+ renderAll();
+}
+function fileToBase64(file){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();
+  r.onload=()=>resolve({name:file.name,mimeType:file.type,data:r.result.split(",")[1]});
+  r.onerror=()=>reject(new Error("Gagal membaca file "+file.name));
+  r.readAsDataURL(file);
+ });
+}
+function filesToPayload(input){return Promise.all([...input.files].map(fileToBase64))}
 function populate(){
  ["filterWilayah","aWilayah","rWilayah"].forEach(id=>{let el=document.getElementById(id); wilayah.forEach(w=>{let o=document.createElement("option");o.value=w;o.textContent=w;el.appendChild(o)})});
 }
@@ -107,16 +172,34 @@ function renderDashboard(){
  document.getElementById("kpiKegiatan").textContent=db.activities.length;document.getElementById("kpiLaporan").textContent=db.reports.length;
  document.getElementById("kpiDesa").textContent=Math.max(sampleDesa.length*wilayah.length,new Set(db.reports.map(x=>x.desa)).size);
 }
-function renderActivities(){document.getElementById("activityBody").innerHTML=db.activities.map((x,i)=>`<tr><td>${esc(x.tanggal)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.jenis)}</td><td>${esc(x.uraian)}</td><td>${(x.files||[]).map(f=>esc(f)).join("<br>")}</td><td><button class="btn danger" onclick="delActivity(${i})">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada arsip kegiatan.</td></tr>'}
-function renderReports(){document.getElementById("reportBody").innerHTML=db.reports.map((x,i)=>`<tr><td>${esc(x.periode)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.progress)}%</td><td><span class="badge ${x.status==="Disetujui"?"done":x.status==="Draft"?"notyet":"process"}">${esc(x.status)}</span></td><td>${esc(x.file||"-")}</td><td><button class="btn danger" onclick="delReport(${i})">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada laporan.</td></tr>'}
-function fileNames(input){return [...input.files].map(x=>x.name)}
-document.getElementById("activityForm").addEventListener("submit",e=>{e.preventDefault();db.activities.push({tanggal:aTanggal.value,wilayah:aWilayah.value,desa:aDesa.value,jenis:aJenis.value,uraian:aUraian.value,files:fileNames(aFile)});save();e.target.reset();renderAll()});
-document.getElementById("reportForm").addEventListener("submit",e=>{e.preventDefault();db.reports.push({periode:rPeriode.value,wilayah:rWilayah.value,desa:rDesa.value,progress:Number(rProgress.value),status:rStatus.value,ringkasan:rRingkasan.value,file:rFile.files[0]?.name||""});save();e.target.reset();renderAll()});
-function delActivity(i){if(confirm("Hapus arsip ini?")){db.activities.splice(i,1);save();renderAll()}}
-function delReport(i){if(confirm("Hapus laporan ini?")){db.reports.splice(i,1);save();renderAll()}}
+function renderActivities(){document.getElementById("activityBody").innerHTML=db.activities.map(x=>`<tr><td>${esc(x.tanggal)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.jenis)}</td><td>${esc(x.uraian)}</td><td>${(x.files||[]).map(f=>esc(f.url?`<a href="${f.url}" target="_blank">${f.name}</a>`:f.name||f)).join("<br>")}</td><td><button class="btn danger" onclick="delActivity('${esc(x.id)}')">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada arsip kegiatan.</td></tr>'}
+function renderReports(){document.getElementById("reportBody").innerHTML=db.reports.map(x=>`<tr><td>${esc(x.periode)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.progress)}%</td><td><span class="badge ${x.status==="Disetujui"?"done":x.status==="Draft"?"notyet":"process"}">${esc(x.status)}</span></td><td>${x.fileUrl?`<a href="${esc(x.fileUrl)}" target="_blank">${esc(x.file||"berkas")}</a>`:esc(x.file||"-")}</td><td><button class="btn danger" onclick="delReport('${esc(x.id)}')">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada laporan.</td></tr>'}
+document.getElementById("activityForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; const t0=btn.textContent; btn.textContent="Menyimpan...";
+ try{
+  const files=await filesToPayload(aFile);
+  await apiPost("addActivity",{payload:{id:"A"+Date.now(),tanggal:aTanggal.value,wilayah:aWilayah.value,desa:aDesa.value,jenis:aJenis.value,uraian:aUraian.value,files}});
+  e.target.reset(); await loadData();
+ }catch(err){alert("Gagal menyimpan kegiatan: "+err.message)}
+ finally{btn.disabled=false; btn.textContent=t0}
+});
+document.getElementById("reportForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; const t0=btn.textContent; btn.textContent="Menyimpan...";
+ try{
+  const files=await filesToPayload(rFile);
+  await apiPost("addReport",{payload:{id:"R"+Date.now(),periode:rPeriode.value,wilayah:rWilayah.value,desa:rDesa.value,progress:Number(rProgress.value),status:rStatus.value,ringkasan:rRingkasan.value,file:files[0]?.name||"",fileData:files[0]||null}});
+  e.target.reset(); await loadData();
+ }catch(err){alert("Gagal menyimpan laporan: "+err.message)}
+ finally{btn.disabled=false; btn.textContent=t0}
+});
+async function delActivity(id){if(!confirm("Hapus arsip ini?"))return; try{await apiPost("deleteActivity",{id}); await loadData();}catch(err){alert("Gagal menghapus: "+err.message)}}
+async function delReport(id){if(!confirm("Hapus laporan ini?"))return; try{await apiPost("deleteReport",{id}); await loadData();}catch(err){alert("Gagal menghapus: "+err.message)}}
 function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="data_desa_cantik.json";a.click();URL.revokeObjectURL(a.href)}
 function renderAll(){renderDashboard();renderActivities();renderReports()}
-populate();renderAll();
+document.getElementById("apiUrlInput").value=getApiUrl();
+populate();loadData();
 </script>
 </body>
 </html>
