@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoring Desa Cantik - Bangka Belitung</title>
+<style>
+:root{--primary:#0f766e;--primary2:#115e59;--bg:#f4f7f8;--card:#fff;--text:#18323a;--muted:#6b7d83;--line:#dce5e7;--ok:#168a5b;--warn:#d97706;--danger:#dc3545}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(135deg,#0f766e,#164e63);color:white;padding:24px 32px;position:sticky;top:0;z-index:10}
+.header{max-width:1400px;margin:auto;display:flex;justify-content:space-between;gap:20px;align-items:center}.brand h1{margin:0 0 6px;font-size:24px}.brand p{margin:0;opacity:.86}
+.container{max-width:1400px;margin:24px auto;padding:0 24px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tab{border:1px solid var(--line);background:white;padding:11px 16px;border-radius:10px;cursor:pointer;font-weight:600;color:var(--muted)}.tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.section{display:none}.section.active{display:block}.grid{display:grid;gap:16px}.kpi{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:20px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 2px 8px #17333d0a}.kpi .card{min-height:105px}.label{font-size:13px;color:var(--muted)}.value{font-size:30px;font-weight:800;margin-top:8px}.small{font-size:12px;color:var(--muted)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}.filters select,.filters input,.form input,.form select,.form textarea{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;font:inherit}.filters select{min-width:180px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:white}table{width:100%;border-collapse:collapse;min-width:980px}th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{background:#f0f5f5;position:sticky;top:0}.progress{height:9px;background:#e7eeee;border-radius:99px;overflow:hidden}.bar{height:100%;background:var(--primary);border-radius:99px}.badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700}.done{background:#dcfce7;color:#166534}.process{background:#fef3c7;color:#92400e}.notyet{background:#fee2e2;color:#991b1b}
+.month-grid{display:grid;grid-template-columns:repeat(12,minmax(75px,1fr));gap:5px}.month{padding:8px 4px;border-radius:7px;text-align:center;font-size:11px;font-weight:700;background:#edf2f2}.month.done{background:#a7f3d0}.month.process{background:#fde68a}.month.notyet{background:#fecaca}
+.form{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.form .full{grid-column:1/-1}.form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}.btn{border:0;border-radius:9px;padding:10px 15px;cursor:pointer;font-weight:700;background:var(--primary);color:white}.btn.secondary{background:#e8efef;color:var(--text)}.btn.danger{background:var(--danger)}.actions{display:flex;gap:8px;flex-wrap:wrap}
+.file-list{display:grid;gap:8px;margin-top:12px}.file-item{display:flex;justify-content:space-between;gap:10px;padding:10px;background:#f6f9f9;border-radius:8px}
+.empty{text-align:center;padding:30px;color:var(--muted)}.notice{padding:12px 14px;border-radius:10px;background:#ecfeff;border:1px solid #bae6fd;color:#164e63;margin-bottom:16px}
+@media(max-width:1000px){.kpi{grid-template-columns:repeat(2,1fr)}.month-grid{grid-template-columns:repeat(6,1fr)}}@media(max-width:650px){.container{padding:0 12px}.kpi,.form{grid-template-columns:1fr}.header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header><div class="header"><div class="brand"><h1>Monitoring Pelaksanaan Pembinaan Desa Cantik</h1><p>BPS Provinsi Kepulauan Bangka Belitung • Dashboard monitoring per kabupaten/kota</p></div><button class="btn secondary" onclick="exportData()">Ekspor Data JSON</button></div></header>
+
+<main class="container">
+<div class="tabs">
+<button class="tab active" onclick="showTab('dashboard',this)">📊 Monitoring Progress</button>
+<button class="tab" onclick="showTab('arsip',this)">🗂️ Arsip Kegiatan</button>
+<button class="tab" onclick="showTab('laporan',this)">📄 Laporan Pembinaan</button>
+</div>
+
+<section id="dashboard" class="section active">
+<div class="notice">Data contoh tersedia untuk demonstrasi. Data pada browser tersimpan di <b>localStorage</b>. Untuk penggunaan multiuser/terpusat, hubungkan fungsi CRUD ke API/database sesuai struktur Excel yang disediakan.</div>
+<div class="grid kpi">
+<div class="card"><div class="label">Total Kabupaten/Kota</div><div class="value" id="kpiWilayah">7</div></div>
+<div class="card"><div class="label">Desa Cantik</div><div class="value" id="kpiDesa">18</div></div>
+<div class="card"><div class="label">Rata-rata Progress</div><div class="value" id="kpiProgress">0%</div></div>
+<div class="card"><div class="label">Kegiatan Terlaksana</div><div class="value" id="kpiKegiatan">0</div></div>
+<div class="card"><div class="label">Laporan Masuk</div><div class="value" id="kpiLaporan">0</div></div>
+</div>
+<div class="card">
+<div class="filters">
+<select id="filterWilayah" onchange="renderDashboard()"><option value="">Semua Kabupaten/Kota</option></select>
+<select id="filterTahun" onchange="renderDashboard()"><option>2026</option><option>2025</option></select>
+</div>
+<div class="table-wrap"><table><thead><tr><th>Kabupaten/Kota</th><th>Desa Cantik</th><th>Progress</th><th>Status</th><th>Progress Bulanan</th></tr></thead><tbody id="progressBody"></tbody></table></div>
+</div>
+</section>
+
+<section id="arsip" class="section">
+<div class="card">
+<h2>Arsip Kegiatan</h2>
+<form id="activityForm" class="form">
+<label>Tanggal<input type="date" id="aTanggal" required></label>
+<label>Kabupaten/Kota<select id="aWilayah" required></select></label>
+<label>Desa Cantik<input id="aDesa" placeholder="Nama desa" required></label>
+<label>Jenis Kegiatan<select id="aJenis"><option>Pembinaan</option><option>Koordinasi</option><option>Monitoring</option><option>Evaluasi</option><option>Pelatihan</option><option>Lainnya</option></select></label>
+<label class="full">Uraian Kegiatan<textarea id="aUraian" rows="3" required></textarea></label>
+<label class="full">Dokumentasi<input type="file" id="aFile" multiple></label>
+<div class="full actions"><button class="btn" type="submit">Simpan Kegiatan</button><button class="btn secondary" type="reset">Reset</button></div>
+</form>
+</div>
+<div class="card" style="margin-top:16px"><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Wilayah</th><th>Desa</th><th>Jenis</th><th>Uraian</th><th>File</th><th>Aksi</th></tr></thead><tbody id="activityBody"></tbody></table></div></div>
+</section>
+
+<section id="laporan" class="section">
+<div class="card">
+<h2>Laporan Pembinaan Desa Cantik</h2>
+<form id="reportForm" class="form">
+<label>Periode<input type="month" id="rPeriode" required></label>
+<label>Kabupaten/Kota<select id="rWilayah" required></select></label>
+<label>Desa Cantik<input id="rDesa" required placeholder="Nama desa"></label>
+<label>Status<select id="rStatus"><option>Draft</option><option>Diajukan</option><option>Diverifikasi</option><option>Disetujui</option></select></label>
+<label>Persentase Progress (%)<input type="number" id="rProgress" min="0" max="100" value="0" required></label>
+<label class="full">Ringkasan<textarea id="rRingkasan" rows="4" placeholder="Ringkasan hasil pembinaan"></textarea></label>
+<label class="full">File Laporan<input type="file" id="rFile" accept=".pdf,.doc,.docx,.xlsx,.xls"></label>
+<div class="full actions"><button class="btn" type="submit">Simpan Laporan</button><button class="btn secondary" type="reset">Reset</button></div>
+</form>
+</div>
+<div class="card" style="margin-top:16px"><div class="table-wrap"><table><thead><tr><th>Periode</th><th>Wilayah</th><th>Desa</th><th>Progress</th><th>Status</th><th>File</th><th>Aksi</th></tr></thead><tbody id="reportBody"></tbody></table></div></div>
+</section>
+</main>
+
+<script>
+const wilayah=["Kabupaten Bangka","Kabupaten Belitung","Kabupaten Bangka Barat","Kabupaten Bangka Tengah","Kabupaten Bangka Selatan","Kabupaten Belitung Timur","Kota Pangkalpinang"];
+const months=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const sampleDesa=["Desa A","Desa B","Desa C"];
+let db=JSON.parse(localStorage.getItem("desaCantikDB")||"null")||{activities:[],reports:[]};
+function save(){localStorage.setItem("desaCantikDB",JSON.stringify(db))}
+function populate(){
+ ["filterWilayah","aWilayah","rWilayah"].forEach(id=>{let el=document.getElementById(id); wilayah.forEach(w=>{let o=document.createElement("option");o.value=w;o.textContent=w;el.appendChild(o)})});
+}
+function showTab(id,btn){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));btn.classList.add("active");}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function statusClass(p){return p>=100?"done":p>0?"process":"notyet"} function statusText(p){return p>=100?"Selesai":p>0?"Berjalan":"Belum Mulai"}
+function calcWilayah(w){
+ let rs=db.reports.filter(x=>x.wilayah===w), p=rs.length?Math.round(rs.reduce((a,b)=>a+Number(b.progress||0),0)/rs.length):0;
+ let monthly=months.map((m,i)=>{let rr=rs.filter(x=>Number((x.periode||"").split("-")[1])===i+1);return rr.length?Math.round(rr.reduce((a,b)=>a+Number(b.progress||0),0)/rr.length):0}); return {p,monthly,desa:[...new Set(rs.map(x=>x.desa).filter(Boolean))].length||sampleDesa.length};
+}
+function renderDashboard(){
+ let f=document.getElementById("filterWilayah").value;let rows=f?[f]:wilayah;let total=0;let body="";
+ rows.forEach(w=>{let x=calcWilayah(w);total+=x.p;body+=`<tr><td><b>${esc(w)}</b></td><td>${x.desa}</td><td style="min-width:180px"><div>${x.p}%</div><div class="progress"><div class="bar" style="width:${x.p}%"></div></div></td><td><span class="badge ${statusClass(x.p)}">${statusText(x.p)}</span></td><td><div class="month-grid">${x.monthly.map(v=>`<div class="month ${statusClass(v)}" title="${v}%">${v}%</div>`).join("")}</div></td></tr>`});
+ document.getElementById("progressBody").innerHTML=body||'<tr><td colspan="5" class="empty">Belum ada data.</td></tr>';
+ document.getElementById("kpiProgress").textContent=Math.round(total/rows.length||0)+"%";
+ document.getElementById("kpiKegiatan").textContent=db.activities.length;document.getElementById("kpiLaporan").textContent=db.reports.length;
+ document.getElementById("kpiDesa").textContent=Math.max(sampleDesa.length*wilayah.length,new Set(db.reports.map(x=>x.desa)).size);
+}
+function renderActivities(){document.getElementById("activityBody").innerHTML=db.activities.map((x,i)=>`<tr><td>${esc(x.tanggal)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.jenis)}</td><td>${esc(x.uraian)}</td><td>${(x.files||[]).map(f=>esc(f)).join("<br>")}</td><td><button class="btn danger" onclick="delActivity(${i})">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada arsip kegiatan.</td></tr>'}
+function renderReports(){document.getElementById("reportBody").innerHTML=db.reports.map((x,i)=>`<tr><td>${esc(x.periode)}</td><td>${esc(x.wilayah)}</td><td>${esc(x.desa)}</td><td>${esc(x.progress)}%</td><td><span class="badge ${x.status==="Disetujui"?"done":x.status==="Draft"?"notyet":"process"}">${esc(x.status)}</span></td><td>${esc(x.file||"-")}</td><td><button class="btn danger" onclick="delReport(${i})">Hapus</button></td></tr>`).join("")||'<tr><td colspan="7" class="empty">Belum ada laporan.</td></tr>'}
+function fileNames(input){return [...input.files].map(x=>x.name)}
+document.getElementById("activityForm").addEventListener("submit",e=>{e.preventDefault();db.activities.push({tanggal:aTanggal.value,wilayah:aWilayah.value,desa:aDesa.value,jenis:aJenis.value,uraian:aUraian.value,files:fileNames(aFile)});save();e.target.reset();renderAll()});
+document.getElementById("reportForm").addEventListener("submit",e=>{e.preventDefault();db.reports.push({periode:rPeriode.value,wilayah:rWilayah.value,desa:rDesa.value,progress:Number(rProgress.value),status:rStatus.value,ringkasan:rRingkasan.value,file:rFile.files[0]?.name||""});save();e.target.reset();renderAll()});
+function delActivity(i){if(confirm("Hapus arsip ini?")){db.activities.splice(i,1);save();renderAll()}}
+function delReport(i){if(confirm("Hapus laporan ini?")){db.reports.splice(i,1);save();renderAll()}}
+function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="data_desa_cantik.json";a.click();URL.revokeObjectURL(a.href)}
+function renderAll(){renderDashboard();renderActivities();renderReports()}
+populate();renderAll();
+</script>
+</body>
+</html>
